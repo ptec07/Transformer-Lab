@@ -6,6 +6,7 @@ import { useSimulationStore } from './store/useSimulationStore'
 
 const EXAMPLES = ['하늘은 왜 파란가요?', '비는 어떻게 내리나요?', '고양이는 왜 잠을 많이 자나요?']
 const FORMULAS = ['xᵢ = E[tokenᵢ]', 'zᵢ = xᵢ + PE(i)', 'Q = zWQ · K = zWK · V = zWV', 'softmax(QKᵀ / √dₖ)V', 'ReLU(xW₁)W₂', 'eˡⁱ / Σeˡʲ', 'P(next token | context)']
+const STAGE_NAMES = ['토큰화', '임베딩', '위치 벡터', '어텐션', '피드 포워드 네트워크', '소프트맥스', '답변 생성']
 
 function VectorGrid({ matrix, labels }: { matrix: Matrix; labels: string[] }) {
   const values = matrix.flat()
@@ -38,7 +39,7 @@ function AttentionMap({ trace }: { trace: TransformerTrace }) {
 function SoftmaxBars({ trace }: { trace: TransformerTrace }) {
   return <div className="probabilities">{trace.probabilities.map((item, index) => <div className="probability" key={item.token}>
     <div><span>{item.token}</span><strong>{(item.value * 100).toFixed(1)}%</strong></div>
-    <div className="bar"><motion.i initial={{ width: 0 }} animate={{ width: `${item.value * 100}%` }} transition={{ duration: .5, delay: index * .08 }}/></div>
+    <div className="bar"><motion.i initial={{ scaleX: 0 }} animate={{ scaleX: item.value }} transition={{ duration: .5, delay: index * .08 }}/></div>
   </div>)}</div>
 }
 
@@ -83,12 +84,29 @@ function App() {
       </div>
     </header>
 
-    <section className="pipeline-section" id="map"><div className="section-heading"><span>THE BIG PICTURE</span><h2>한 문장이 지나가는 7개의 방</h2><p>복잡해 보여도, 한 단계씩 보면 모두 작은 계산입니다.</p></div><div className="pipeline">{trace.stages.map((item, i) => <button key={item.id} onClick={() => setStage(i)} className={i === stage ? 'active' : ''}><small>{String(i + 1).padStart(2, '0')}</small><b>{item.title.split(' ').slice(0, 2).join(' ')}</b>{i < trace.stages.length - 1 && <ArrowRight/>}</button>)}</div></section>
+    <section className="pipeline-section" id="map">
+      <div className="section-heading"><span>THE BIG PICTURE</span><h2>한 문장이 지나가는 7개의 방</h2><p>각 방은 하나의 계산만 담당합니다. 카드를 눌러 원하는 단계를 바로 확인하세요.</p></div>
+      <nav className="stage-navigation" aria-label="Transformer 7단계">
+        <ol className="pipeline">
+          {trace.stages.map((item, i) => {
+            const state = i === stage ? 'active' : i < stage ? 'complete' : 'upcoming'
+            const label = `${i + 1}단계 ${STAGE_NAMES[i]} ${item.title}`
+            return <li key={item.id} className={state}>
+              <button type="button" onClick={() => setStage(i)} aria-label={label} aria-current={i === stage ? 'step' : undefined}>
+                <span className="step-number">{String(i + 1).padStart(2, '0')}</span>
+                <span className="step-copy"><small>{STAGE_NAMES[i]}</small><b>{item.title}</b></span>
+                <span className="step-state" aria-hidden="true">{i === stage ? '현재' : i < stage ? '완료' : '다음'}</span>
+              </button>
+            </li>
+          })}
+        </ol>
+      </nav>
+    </section>
 
     <section className="lab" id="lab">
-      <aside className="control-panel"><span className="section-kicker">TRY IT YOURSELF</span><h2>질문을 입력해 보세요.</h2><p>짧고 쉬운 질문일수록 계산 흐름이 잘 보여요.</p><form onSubmit={submit}><label htmlFor="question">질문 입력</label><textarea id="question" value={question} onChange={(e) => setQuestion(e.target.value)} maxLength={80}/><div className="examples">{EXAMPLES.map((example) => <button type="button" key={example} onClick={() => setQuestion(example)}>{example}</button>)}</div><button className="submit" type="submit">계산 시작 <ArrowRight/></button></form><div className="mode-switch"><span>설명 깊이</span><div><button className={mode === 'beginner' ? 'active' : ''} onClick={() => setMode('beginner')}>초보자 모드</button><button className={mode === 'formula' ? 'active' : ''} onClick={() => setMode('formula')}>수식 모드</button></div></div><div className="speed"><label htmlFor="speed">재생 속도 <b>{speed}×</b></label><input id="speed" type="range" min="0.5" max="2" step="0.5" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}/></div></aside>
+      <aside className="control-panel"><span className="section-kicker">TRY IT YOURSELF</span><h2>질문을 입력해 보세요.</h2><p>짧고 쉬운 질문일수록 계산 흐름이 잘 보여요.</p><form onSubmit={submit}><label htmlFor="question">질문 입력</label><textarea id="question" value={question} onChange={(e) => setQuestion(e.target.value)} maxLength={80}/><div className="examples">{EXAMPLES.map((example) => <button type="button" key={example} onClick={() => setQuestion(example)}>{example}</button>)}</div><button className="submit" type="submit">계산 시작 <ArrowRight/></button></form><div className="mode-switch"><span>설명 깊이</span><div><button type="button" className={mode === 'beginner' ? 'active' : ''} onClick={() => setMode('beginner')}>초보자 모드</button><button type="button" className={mode === 'formula' ? 'active' : ''} onClick={() => setMode('formula')}>수식 모드</button></div></div><div className="speed"><label htmlFor="speed">재생 속도 <b>{speed}×</b></label><input id="speed" type="range" min="0.5" max="2" step="0.5" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}/></div></aside>
 
-      <div className="stage-card"><div className="stage-top"><div><span>{current.eyebrow}</span><h2>{current.title}</h2></div><div className="matrix-badge"><Gauge size={16}/>{matrixSummary}</div></div><p className="plain"><CircleHelp size={19}/>{current.plain}</p>{mode === 'formula' && <div className="formula"><Equal size={18}/><code>{stage === 3 ? 'Attention(Q,K,V) = ' : ''}{FORMULAS[stage]}</code></div>}<AnimatePresence mode="wait"><motion.div className="visual-canvas" key={`${trace.question}-${current.id}-${mode}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: reduceMotion ? 0 : .22, ease: 'easeOut' }}><StageVisual trace={trace} stage={stage}/></motion.div></AnimatePresence><div className="transport"><button onClick={() => { reset(); }} aria-label="처음부터"><RotateCcw/></button><button onClick={previous} disabled={stage === 0} aria-label="이전 단계"><ChevronLeft/></button><button className="play" onClick={togglePlaying} aria-label={playing ? '일시정지' : '재생'}>{playing ? <Pause/> : <Play/>}</button><button onClick={() => next(trace.stages.length - 1)} disabled={stage === trace.stages.length - 1} aria-label="다음 단계"><ChevronRight/></button><div className="progress"><i style={{ width: `${(stage + 1) / trace.stages.length * 100}%` }}/></div><span>{stage + 1} / {trace.stages.length}</span></div></div>
+      <div className="stage-card"><div className="stage-top"><div><span>{current.eyebrow}</span><h2>{current.title}</h2></div><div className="matrix-badge"><Gauge size={16}/>{matrixSummary}</div></div><p className="plain"><CircleHelp size={19}/>{current.plain}</p>{mode === 'formula' && <div className="formula"><Equal size={18}/><code>{stage === 3 ? 'Attention(Q,K,V) = ' : ''}{FORMULAS[stage]}</code></div>}<AnimatePresence mode="wait"><motion.div className="visual-canvas" key={`${trace.question}-${current.id}-${mode}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: reduceMotion ? 0 : .22, ease: 'easeOut' }}><StageVisual trace={trace} stage={stage}/></motion.div></AnimatePresence><div className="transport"><button type="button" onClick={() => { reset(); }} aria-label="처음부터"><RotateCcw/></button><button type="button" onClick={previous} disabled={stage === 0} aria-label="이전 단계"><ChevronLeft/></button><button type="button" className="play" onClick={togglePlaying} aria-label={playing ? '일시정지' : '재생'}>{playing ? <Pause/> : <Play/>}</button><button type="button" onClick={() => next(trace.stages.length - 1)} disabled={stage === trace.stages.length - 1} aria-label="다음 단계"><ChevronRight/></button><div className="progress"><i style={{ width: `${(stage + 1) / trace.stages.length * 100}%` }}/></div><span>{stage + 1} / {trace.stages.length}</span></div></div>
     </section>
 
     <section className="analogy"><span className="section-kicker">REMEMBER THIS</span><h2>Transformer는 거대한<br/><em>문맥 탐정</em>입니다.</h2><div className="analogy-grid"><article><b>1</b><h3>단어를 숫자로 번역하고</h3><p>의미가 비슷한 단어는 가까운 숫자 좌표를 가져요.</p></article><article><b>2</b><h3>서로의 관계를 살핀 뒤</h3><p>지금 답하는 데 중요한 단어에 더 집중해요.</p></article><article><b>3</b><h3>다음 말을 확률로 고릅니다</h3><p>이 과정을 매우 빠르게 반복하면 자연스러운 답이 돼요.</p></article></div></section>
